@@ -1,0 +1,16 @@
+{
+    "type": "FeatureCollection",
+    "name": "TourismOrganizers",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": { "id": "1", "name": "Туристско-информационный пункт НП", "type": "info_center" },
+        "geometry": { "type": "Point", "coordinates": [27.112167, 55.618056] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "2", "name": "ТИЦ «Дривятич»", "type": "info_center" },
+        "geometry": { "type": "Point", "coordinates": [27.038778, 55.637278] }
+      }
+    ]
+  }

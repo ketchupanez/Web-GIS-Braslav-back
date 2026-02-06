@@ -1,0 +1,42 @@
+{
+  "name": "gis-app-back",
+  "version": "1.0.0",
+  "description": "Backend for Braslav Lakes GIS",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "tsc",
+    "start": "bun dist/index.js",
+    "db:migrate": "bunx prisma migrate dev",
+    "db:deploy": "bunx prisma migrate deploy",
+    "db:studio": "bunx prisma studio",
+    "db:generate": "bunx prisma generate",
+    "db:seed:admin": "bun run prisma/seed/create-super-admin.ts",
+    "db:seed:lakes": "bun run prisma/seed/import-lakes.ts"
+  },
+  "keywords": ["gis", "braslav", "nodejs"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "xlsx": "^0.18.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.4",
+    "prisma": "5.22.0",
+    "typescript": "^5.3.3"
+  },
+  "prisma": {
+    "seed": "bun run prisma/seed/import-geo.ts"
+  }
+}

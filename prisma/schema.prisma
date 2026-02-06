@@ -1,0 +1,295 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  MAIN_ADMIN  
+  ADMIN
+  PENDING
+}
+
+enum ObjectType {
+  LAKE
+  RIVER
+  SPRING
+  ACCOMMODATION
+  TOURIST_STOP
+  ORGANIZER
+}
+
+enum AccommodationType {
+  HOTEL
+  GUESTHOUSE
+  RESORT
+  CAMPING
+}
+
+enum TourismOrgType {
+  INFO_CENTER
+  TOUR_OPERATOR
+  GUIDE_SERVICE
+}
+
+enum DepthType {
+  SURFACE
+  BOTTOM
+  MIDDLE
+}
+
+// ==================== USERS ====================
+model User {
+  id        String   @id @default(uuid())
+  login     String   @unique
+  password  String
+  fullName  String   @map("full_name")
+  position  String?
+  contactInfo String? @map("contact_info")
+  role      UserRole @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  dynamicTables  DynamicTable[]
+  dynamicData    DynamicRecord[]
+  auditLogs   AuditLog[]
+  
+  @@map("users")
+}
+
+// ==================== ИНФРАСТРУКТУРА ====================
+model Accommodation {
+  id          Int               @id @default(autoincrement())
+  name        String            @unique
+  type        String?
+  geometry    Json              // GeoJSON Point
+  coordinates Float[]           // [lon, lat]
+
+  address     String?
+  sourceFile  String?           @map("source_file")
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime?         @updatedAt
+  
+  dynamicRecords DynamicRecord[]
+  
+  @@index([type])
+  @@map("accommodations")
+}
+
+model TouristStop {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  geometry    Json      // GeoJSON Point
+  coordinates Float[]   // [lon, lat]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  
+  dynamicRecords DynamicRecord[]
+  
+  @@map("tourist_stops")
+}
+
+model TourismOrganizer {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique
+  type        String?
+  geometry    Json           // GeoJSON Point
+  coordinates Float[]        // [lon, lat]
+
+  address     String?
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime?      @updatedAt
+  
+  dynamicRecords DynamicRecord[]
+  
+  @@map("tourism_organizers")
+}
+
+// ==================== ВОДНЫЕ ОБЪЕКТЫ ====================
+model Lake {
+  id                   Int       @id @default(autoincrement())
+  name                 String    @unique
+  geometry             Json      // GeoJSON Polygon или MultiPolygon
+  center               Float[]   // [lon, lat]
+
+  areaHa               Float?    @map("area_ha")
+  
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime? @updatedAt
+  
+  dynamicRecords DynamicRecord[]
+  
+  @@map("lakes")
+}
+
+model River {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  
+  segments    RiverSegment[]
+  springs     Spring[]
+  
+  dynamicRecords DynamicRecord[]
+  
+  @@map("rivers")
+}
+
+model RiverSegment {
+  id       Int    @id @default(autoincrement())
+  riverId  Int    @map("river_id")
+  river    River  @relation(fields: [riverId], references: [id], onDelete: Cascade)
+  
+  geometry Json   // GeoJSON LineString
+
+  order    Int    @default(0)
+  
+  @@map("river_segments")
+}
+
+model Spring {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  
+  geometry    Json      // GeoJSON Point
+  coordinates Float[]   // [lon, lat]
+  
+  riverId     Int?      @map("river_id")
+  river       River?    @relation(fields: [riverId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  
+  dynamicRecords DynamicRecord[]
+  
+  @@map("springs")
+}
+
+// ==================== ДИНАМИЧЕСКИЕ ТАБЛИЦЫ ====================
+model DynamicTable {
+  id            String   @id @default(uuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  
+  groupKey      String?
+  displayName   String?
+  category      String
+  year          Int?
+  color         String   @default("blue")
+  icon          String?
+  
+  columnsConfig Json
+  
+  linkedToObjects Boolean @default(false)
+  objectType      ObjectType?
+  
+  createdBy     String   @map("created_by")
+  user          User     @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  records       DynamicRecord[]
+  charts        ChartConfig[]
+  
+  @@map("dynamic_tables")
+}
+
+model DynamicRecord {
+  id          String   @id @default(uuid())
+  tableId     String   @map("table_id")
+  table       DynamicTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  
+  // Привязка к системным объектам — теперь Int!
+  lakeId      Int?     @map("lake_id")
+  riverId     Int?     @map("river_id")
+  springId    Int?     @map("spring_id")
+  accommodationId Int? @map("accommodation_id")
+  touristStopId   Int? @map("tourist_stop_id")
+  organizerId     Int? @map("organizer_id")
+  
+  lake        Lake?    @relation(fields: [lakeId], references: [id])
+  river       River?   @relation(fields: [riverId], references: [id])
+  spring      Spring?  @relation(fields: [springId], references: [id])
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id])
+  touristStop TouristStop? @relation(fields: [touristStopId], references: [id])
+  organizer   TourismOrganizer? @relation(fields: [organizerId], references: [id])
+  
+  data        Json
+  year        Int?
+  date        DateTime?
+  
+  lockedBy    String?  @map("locked_by")
+  lockedAt    DateTime? @map("locked_at")
+  
+  createdBy   String   @map("created_by")
+  user        User     @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tableId, lakeId])
+  @@index([tableId, riverId])
+  @@index([tableId, springId])
+  @@index([tableId, accommodationId])
+  @@index([tableId, touristStopId])
+  @@index([tableId, organizerId])
+  @@map("dynamic_records")
+}
+
+// ==================== ГРАФИКИ ====================
+model ChartConfig {
+  id            String   @id @default(uuid())
+  tableId       String   @map("table_id")
+  table         DynamicTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  
+  title         String
+  type          String
+  
+  xAxis         Json
+  yAxis         Json
+  
+  filters       Json?
+  
+  showInPopup   Boolean  @default(false)
+  popupOrder    Int      @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("chart_configs")
+}
+
+// ==================== АУДИТ ЛОГОВ ====================
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  
+  action      String
+  
+  tableRef    String?  @map("table_ref")
+  tableName   String?  @map("table_name")
+  
+  recordId    String?  @map("record_id")
+  recordName  String?  @map("record_name")
+  
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  description String?
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@index([userId, createdAt])
+  @@index([tableRef])
+  @@index([recordId])
+  @@map("audit_logs")
+}

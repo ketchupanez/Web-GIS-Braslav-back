@@ -1,0 +1,46 @@
+{
+    "type": "FeatureCollection",
+    "name": "Accommodation",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": { "id": "1", "name": "Braslaw Lakes Hotel", "type": "hotel" },
+        "geometry": { "type": "Point", "coordinates": [27.052056, 55.633083] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "2", "name": "Гостиница Куп ЖКХ", "type": "hotel" },
+        "geometry": { "type": "Point", "coordinates": [27.030333, 55.639833] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "3", "name": "Фальварак", "type": "guesthouse" },
+        "geometry": { "type": "Point", "coordinates": [27.057111, 55.631889] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "4", "name": "База отдыха Дривяты", "type": "resort" },
+        "geometry": { "type": "Point", "coordinates": [27.070778, 55.612972] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "5", "name": "База отдыха Леошки", "type": "resort" },
+        "geometry": { "type": "Point", "coordinates": [27.148528, 55.741056] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "6", "name": "База отдыха Слободка", "type": "resort" },
+        "geometry": { "type": "Point", "coordinates": [27.173611, 55.680556] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "7", "name": "База отдыха Золово", "type": "resort" },
+        "geometry": { "type": "Point", "coordinates": [27.075333, 55.521611] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "id": "8", "name": "ТОК «Браславские озера»", "type": "resort" },
+        "geometry": { "type": "Point", "coordinates": [27.073278, 55.615889] }
+      }
+    ]
+  }
