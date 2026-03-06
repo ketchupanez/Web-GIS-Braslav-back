@@ -30,7 +30,6 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-// Проверка ролей
 export const requireRole = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {

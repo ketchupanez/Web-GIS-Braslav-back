@@ -5,10 +5,10 @@ type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'IMPORT
 interface AuditLogData {
   userId: string;
   action: AuditAction;
-  tableRef?: string;      // 'lakes', 'hydro-2024'
-  tableName?: string;     // 'Озёра', 'Гидрохимия 2024'
-  recordId?: string;      // ID записи
-  recordName?: string;    // 'Дривяты', 'Проба №1'
+  tableRef?: string;
+  tableName?: string;
+  recordId?: string;
+  recordName?: string;
   oldValue?: any;
   newValue?: any;
   description?: string;
@@ -30,8 +30,6 @@ export class AuditService {
       },
     });
   }
-
-  // Упрощённые методы для частых случаев
   
   async logCreate(data: Omit<AuditLogData, 'action'>) {
     return this.log({ ...data, action: 'CREATE' });

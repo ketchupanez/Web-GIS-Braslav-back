@@ -5,7 +5,6 @@ import { AuditService } from '../audit/audit.service';
 
 const router = Router();
 
-// Функция транслитерации
 const transliterate = (text: string): string => {
   const map: Record<string, string> = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
@@ -27,11 +26,9 @@ const transliterate = (text: string): string => {
     .substring(0, 50);
 };
 
-// Создать динамическую таблицу
 router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     
-    // Если body пришло как строка, распарсим
     let body = req.body;
     if (typeof body === 'string') {
       try {
@@ -42,20 +39,16 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
     }
     
     const { name, slug, category, year, columns, linkedToObjects, objectType, description, categories } = body;
-    
-    // Проверка name
+
     if (!name) {
       return res.status(400).json({ message: 'Необходимо указать название таблицы' });
     }
     
-    // Проверка categories/columnsConfig существуют
     if (!categories && !category) {
       return res.status(400).json({ message: 'Необходимо указать категорию' });
     }
     
-    // Проверка columnsConfig — теперь с более мягкой проверкой
     if (!columns) {
-      console.log('ERROR: columnsConfig is falsy:', columns);
       return res.status(400).json({ 
         message: 'Необходимо указать колонки таблицы',
         debug: {
@@ -68,27 +61,36 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
     }
   
     
-    // Используем category или categories
     const finalCategory = category || (categories?.[0]) || 'Общее';
     
-    // Генерируем slug
+    const existingByName = await prisma.dynamicTable.findFirst({
+      where: {
+        name: {
+          equals: name,
+          mode: 'insensitive'
+        }
+      }
+    });
+
+    if (existingByName) {
+      return res.status(400).json({ 
+        message: `Таблица с названием "${name}" уже существует` 
+      });
+}
+
     const finalSlug = slug 
       ? slug.toLowerCase().trim()
       : transliterate(name);
     
-    // Валидация slug
     const slugRegex = /^[a-z0-9_-]+$/;
     
     if (!slugRegex.test(finalSlug)) {
-      console.log('ERROR: Invalid slug format:', finalSlug);
       return res.status(400).json({ 
         message: 'Slug может содержать только a-z, 0-9, _, -',
         slug: finalSlug 
       });
     }
 
-    // Проверка уникальности slug
-    console.log('Checking slug uniqueness...');
     const existing = await prisma.dynamicTable.findUnique({
       where: { slug: finalSlug }
     });
@@ -105,7 +107,6 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
       }
     }
 
-    // Валидация columnsConfig
     if (!Array.isArray(columns)) {
       return res.status(400).json({ message: 'columnsConfig должен быть массивом' });
     }
@@ -114,7 +115,6 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
       return res.status(400).json({ message: 'Необходимо указать хотя бы одну колонку' });
     }
 
-    // Валидация каждой колонки
     const validColumns = [];
     for (let i = 0; i < columns.length; i++) {
       const col = columns[i];
@@ -137,7 +137,6 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
       });
     }
 
-    // Подготовка данных для создания
     const createData = {
       name,
       slug: uniqueSlug,
@@ -154,7 +153,6 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
       data: createData
     });
 
-    // Логируем
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -174,7 +172,25 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
   }
 });
 
-// Получить все динамические таблицы
+router.get('/public', async (req, res) => {
+  try {
+    const tables = await prisma.dynamicTable.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        columnsConfig: true,
+        linkedToObjects: true,
+        objectType: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(tables);
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка загрузки таблиц' });
+  }
+});
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const tables = await prisma.dynamicTable.findMany({
@@ -191,12 +207,81 @@ router.get('/', authenticate, async (req, res) => {
       recordCount: t._count.records,
     })));
   } catch (error) {
-    console.error('Error fetching tables:', error);
     res.status(500).json({ message: 'Ошибка загрузки таблиц' });
   }
 });
 
-// Получить одну таблицу с записями
+router.get('/check-name', authenticate, async (req, res) => {
+  try {
+    const { name } = req.query;
+    
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ message: 'Укажите название' });
+    }
+    
+    const existing = await prisma.dynamicTable.findFirst({
+      where: {
+        name: {
+          equals: name,
+          mode: 'insensitive'
+        }
+      }
+    });
+    
+    if (existing) {
+      return res.status(409).json({ 
+        message: `Таблица с названием "${name}" уже существует` 
+      });
+    }
+    
+    res.json({ available: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка проверки' });
+  }
+});
+
+// Получение статуса активности
+router.get('/activity-status', authenticate, async (_req, res) => {
+  try {
+    const twentySecondsAgo= new Date(Date.now() - 20 * 1000);
+    
+    const activeTables = await prisma.dynamicTable.findMany({
+      where: {
+        lastAccessedAt: {
+          gte: twentySecondsAgo
+        }
+      },
+      select: {
+        id: true,
+        slug: true,
+        lastAccessedAt: true,
+        lastAccessedBy: true,
+      }
+    });
+
+    const userIds = [...new Set(activeTables.map(t => t.lastAccessedBy).filter(Boolean))];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds as string[] } },
+      select: { id: true, fullName: true }
+    });
+    
+    const userMap = new Map(users.map(u => [u.id, u.fullName]));
+    
+    const result = activeTables.map(table => ({
+      tableId: table.id,
+      tableSlug: table.slug,
+      isActive: true,
+      accessedAt: table.lastAccessedAt,
+      accessedBy: table.lastAccessedBy,
+      accessedByName: userMap.get(table.lastAccessedBy!) || 'Неизвестный пользователь',
+    }));
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка получения статуса' });
+  }
+});
+
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const table = await prisma.dynamicTable.findUnique({
@@ -209,7 +294,6 @@ router.get('/:id', authenticate, async (req, res) => {
     });
     
     if (!table) {
-      // Попробуем найти по slug
       const tableBySlug = await prisma.dynamicTable.findUnique({
         where: { slug: req.params.id },
         include: {
@@ -234,17 +318,16 @@ router.get('/:id', authenticate, async (req, res) => {
       recordCount: table._count.records,
     });
   } catch (error) {
-    console.error('Error fetching table:', error);
     res.status(500).json({ message: 'Ошибка загрузки таблицы' });
   }
 });
 
-// Удалить динамическую таблицу (только SUPER_ADMIN)
-router.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.userId;
+    const userRole = req.user!.role;
     
-    // Ищем по id или slug
     let table = await prisma.dynamicTable.findUnique({ where: { id } });
     if (!table) {
       table = await prisma.dynamicTable.findUnique({ where: { slug: id } });
@@ -254,12 +337,14 @@ router.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res)
       return res.status(404).json({ message: 'Таблица не найдена' });
     }
 
-    // Каскадное удаление записей через onDelete: Cascade в схеме
+    if (userRole !== 'SUPER_ADMIN' && table.createdBy !== userId) {
+      return res.status(403).json({ message: 'Нет прав на удаление этой таблицы' });
+    }
+
     await prisma.dynamicTable.delete({
       where: { id: table.id },
     });
 
-    // Логируем
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -270,22 +355,15 @@ router.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res)
 
     res.json({ message: 'Таблица удалена' });
   } catch (error) {
-    console.error('Error deleting table:', error);
     res.status(500).json({ message: 'Ошибка удаления таблицы' });
   }
 });
 
-  // ==========================================
-// ЗАПИСИ В КАСТОМНЫХ ТАБЛИЦАХ (DynamicRecord)
-// ==========================================
-
-// Получить записи таблицы (с фильтрами и связанными объектами)
 router.get('/:id/records', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const { lakeId, riverId, springId, year, search } = req.query;
     
-    // Ищем таблицу по id или по slug
     let table = await prisma.dynamicTable.findUnique({
       where: { id },
       include: {
@@ -316,7 +394,6 @@ router.get('/:id/records', authenticate, async (req, res) => {
       },
     });
     
-    // Если не нашли по id, ищем по slug
     if (!table) {
       table = await prisma.dynamicTable.findUnique({
         where: { slug: id },
@@ -365,12 +442,10 @@ router.get('/:id/records', authenticate, async (req, res) => {
       records: table.records,
     });
   } catch (error) {
-    console.error('Error fetching records:', error);
     res.status(500).json({ message: 'Ошибка загрузки записей' });
   }
 });
   
-  // Получить одну запись
   router.get('/:tableId/records/:recordId', authenticate, async (req, res) => {
     try {
       const record = await prisma.dynamicRecord.findUnique({
@@ -399,13 +474,11 @@ router.get('/:id/records', authenticate, async (req, res) => {
     }
   });
 
-  // Создать запись в таблице
 router.post('/:id/records', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const { data, year, date, lakeId, riverId, springId, accommodationId, touristStopId, organizerId } = req.body;
     
-    // Ищем таблицу по id или slug
     let table = await prisma.dynamicTable.findUnique({
       where: { id },
     });
@@ -420,9 +493,8 @@ router.post('/:id/records', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SU
       return res.status(404).json({ message: 'Таблица не найдена' });
     }
     
-    const tableId = table.id; // используем реальный id
+    const tableId = table.id;
     
-    // Валидация по конфигу колонок
     const config = table.columnsConfig as any[];
     const errors: string[] = [];
     
@@ -457,32 +529,36 @@ router.post('/:id/records', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SU
       },
     });
     
-    // Логируем
     const audit = new AuditService();
+    const recordName = (data as any).name || 
+                        (data as any).station || 
+                        (data as any).n_proby || 
+                        (data as any).sample_name || 
+                        (data as any).object_name || 
+                        (data as any).title ||
+                        (data as any).label ||
+                        `Запись ${record.id.slice(0, 8)}`;
+
     await audit.logCreate({
       userId: req.user!.userId,
       tableRef: table.slug,
       tableName: table.name,
       recordId: record.id,
-      recordName: (data as any).name || (data as any).station || `Запись ${record.id.slice(0, 8)}`,
+      recordName: recordName,
       description: `Создана запись в таблице "${table.name}"`,
     });
     
     res.status(201).json(record);
   } catch (error) {
-    console.error('Error creating record:', error);
     res.status(500).json({ message: 'Ошибка создания записи' });
   }
 });
   
-  // Обновить запись
-  // Обновить запись
 router.patch('/:tableId/records/:recordId', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { tableId, recordId } = req.params;
     const { data, year, date, lakeId, riverId, springId, accommodationId, touristStopId, organizerId } = req.body;
     
-    // Ищем таблицу по id или slug
     let table = await prisma.dynamicTable.findUnique({
       where: { id: tableId },
     });
@@ -507,7 +583,6 @@ router.patch('/:tableId/records/:recordId', authenticate, requireRole('ADMIN', '
       return res.status(404).json({ message: 'Запись не найдена' });
     }
     
-    // Проверка блокировки (optimistic locking)
     if (oldRecord.lockedBy && oldRecord.lockedBy !== req.user!.userId) {
       const lockedUser = await prisma.user.findUnique({
         where: { id: oldRecord.lockedBy },
@@ -534,14 +609,24 @@ router.patch('/:tableId/records/:recordId', authenticate, requireRole('ADMIN', '
       },
     });
     
-    // Логируем
     const audit = new AuditService();
+    const recordName = (data as any).name || 
+                   (data as any).station || 
+                   (data as any).n_proby || 
+                   (data as any).sample_name || 
+                   (data as any).object_name || 
+                   (data as any).title ||
+                   (data as any).label ||
+                   (oldRecord.data as any)?.name ||
+                   (oldRecord.data as any)?.station ||
+                   `Запись ${updated.id.slice(0, 8)}`;
+
     await audit.logUpdate({
       userId: req.user!.userId,
       tableRef: table.slug,
       tableName: table.name,
       recordId: updated.id,
-      recordName: (data as any).name || (data as any).station || `Запись ${updated.id.slice(0, 8)}`,
+      recordName: recordName,
       oldValue: oldRecord.data,
       newValue: data,
       description: `Изменена запись в таблице "${table.name}"`,
@@ -549,18 +634,14 @@ router.patch('/:tableId/records/:recordId', authenticate, requireRole('ADMIN', '
     
     res.json(updated);
   } catch (error) {
-    console.error('Error updating record:', error);
     res.status(500).json({ message: 'Ошибка обновления записи' });
   }
 });
   
-  // Удалить запись
-  // Удалить запись
 router.delete('/:tableId/records/:recordId', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { tableId, recordId } = req.params;
-    
-    // Ищем таблицу по id или slug
+
     let table = await prisma.dynamicTable.findUnique({
       where: { id: tableId },
     });
@@ -589,30 +670,35 @@ router.delete('/:tableId/records/:recordId', authenticate, requireRole('ADMIN', 
       where: { id: recordId },
     });
     
-    // Логируем
     const audit = new AuditService();
+    const recordName = (record.data as any)?.name || 
+                   (record.data as any)?.station || 
+                   (record.data as any)?.n_proby || 
+                   (record.data as any)?.sample_name || 
+                   (record.data as any)?.object_name || 
+                   (record.data as any)?.title ||
+                   (record.data as any)?.label ||
+                   `Запись ${record.id.slice(0, 8)}`;
+
     await audit.logDelete({
       userId: req.user!.userId,
       tableRef: table.slug,
       tableName: table.name,
       recordId: record.id,
-      recordName: (record.data as any)?.name || (record.data as any)?.station || `Запись ${record.id.slice(0, 8)}`,
+      recordName: recordName,
       description: `Удалена запись из таблицы "${table.name}"`,
     });
     
     res.json({ message: 'Запись удалена' });
   } catch (error) {
-    console.error('Error deleting record:', error);
     res.status(500).json({ message: 'Ошибка удаления записи' });
   }
 });
   
- // Блокировка записи для редактирования (optimistic locking)
 router.post('/:tableId/records/:recordId/lock', authenticate, async (req, res) => {
   try {
     const { tableId, recordId } = req.params;
     
-    // Ищем таблицу по id или slug
     let table = await prisma.dynamicTable.findUnique({
       where: { id: tableId },
     });
@@ -641,12 +727,10 @@ router.post('/:tableId/records/:recordId/lock', authenticate, async (req, res) =
   }
 });
 
-// Разблокировка записи
 router.post('/:tableId/records/:recordId/unlock', authenticate, async (req, res) => {
   try {
     const { tableId, recordId } = req.params;
-    
-    // Ищем таблицу по id или slug
+
     let table = await prisma.dynamicTable.findUnique({
       where: { id: tableId },
     });
@@ -665,7 +749,6 @@ router.post('/:tableId/records/:recordId/unlock', authenticate, async (req, res)
       where: { id: recordId },
     });
     
-    // Только тот, кто заблокиров, или супер-админ может разблокировать
     if (record?.lockedBy && record.lockedBy !== req.user!.userId && req.user?.role !== 'SUPER_ADMIN') {
       return res.status(403).json({ message: 'Нельзя разблокировать чужую запись' });
     }
@@ -681,6 +764,133 @@ router.post('/:tableId/records/:recordId/unlock', authenticate, async (req, res)
     res.json(updated);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка разблокировки записи' });
+  }
+});
+
+// Индикатор работы над таблицей
+router.post('/:id/access', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    let table = await prisma.dynamicTable.findUnique({ where: { id } });
+    if (!table) {
+      table = await prisma.dynamicTable.findUnique({ where: { slug: id } });
+    }
+    
+    if (!table) {
+      return res.status(404).json({ message: 'Таблица не найдена' });
+    }
+    
+    const updated = await prisma.dynamicTable.update({
+      where: { id: table.id },
+      data: {
+        lastAccessedAt: new Date(),
+        lastAccessedBy: req.user!.userId,
+      },
+    });
+    
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { fullName: true }
+    });
+    
+    res.json({
+      lastAccessedAt: updated.lastAccessedAt,
+      lastAccessedBy: updated.lastAccessedBy,
+      lastAccessedByName: user?.fullName || 'Неизвестный пользователь',
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка обновления доступа' });
+  }
+});
+
+// Сброс индикатора
+router.post('/:id/leave', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    let table = await prisma.dynamicTable.findUnique({ where: { id } });
+    if (!table) {
+      table = await prisma.dynamicTable.findUnique({ where: { slug: id } });
+    }
+    
+    if (!table) {
+      return res.status(404).json({ message: 'Таблица не найдена' });
+    }
+    
+    if (table.lastAccessedBy === req.user!.userId) {
+      await prisma.dynamicTable.update({
+        where: { id: table.id },
+        data: {
+          lastAccessedAt: new Date(Date.now() - 10 * 60 * 1000),
+          lastAccessedBy: null,
+        },
+      });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка' });
+  }
+});
+
+router.post('/:id/records/bulk-delete', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recordIds } = req.body;
+    
+    if (!Array.isArray(recordIds) || recordIds.length === 0) {
+      return res.status(400).json({ message: 'Необходимо указать массив ID записей' });
+    }
+    
+    let table = await prisma.dynamicTable.findUnique({
+      where: { id },
+    });
+    
+    if (!table) {
+      table = await prisma.dynamicTable.findUnique({
+        where: { slug: id },
+      });
+    }
+    
+    if (!table) {
+      return res.status(404).json({ message: 'Таблица не найдена' });
+    }
+    
+    const realTableId = table.id;
+    
+    const records = await prisma.dynamicRecord.findMany({
+      where: {
+        id: { in: recordIds },
+        tableId: realTableId,
+      },
+    });
+    
+    if (records.length !== recordIds.length) {
+      return res.status(400).json({ message: 'Некоторые записи не найдены или не принадлежат этой таблице' });
+    }
+    
+    await prisma.dynamicRecord.deleteMany({
+      where: {
+        id: { in: recordIds },
+        tableId: realTableId,
+      },
+    });
+    
+    const audit = new AuditService();
+    await audit.logDelete({
+      userId: req.user!.userId,
+      tableRef: table.slug,
+      tableName: table.name,
+      description: `Массовое удаление: ${records.length} записей из таблицы "${table.name}"`,
+    });
+    
+    res.json({ 
+      message: 'Записи удалены', 
+      deletedCount: records.length 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка массового удаления записей' });
   }
 });
 

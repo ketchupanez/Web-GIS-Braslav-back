@@ -12,18 +12,24 @@
     "db:studio": "bunx prisma studio",
     "db:generate": "bunx prisma generate",
     "db:seed:admin": "bun run prisma/seed/create-super-admin.ts",
-    "db:seed:lakes": "bun run prisma/seed/import-lakes.ts"
+    "db:seed:geo": "bun run prisma/seed/import-geo.ts"
   },
   "keywords": ["gis", "braslav", "nodejs"],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@types/archiver": "^7.0.0",
+    "@types/extract-zip": "^2.0.3",
+    "@types/node-cron": "^3.0.11",
+    "archiver": "^7.0.1",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "extract-zip": "^2.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^4.2.1",
     "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },

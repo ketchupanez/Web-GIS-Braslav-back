@@ -1,33 +1,42 @@
 # Backend ГИС Браславские озера
 
-## Требования
-- Node.js 18+ или Bun
-- PostgreSQL 15+
-- PostGIS (опционально, для продвинутых геозапросов)
-
-## Установка
-1. Создать базу данных: CREATE DATABASE braslav_gis;
-2. Установить зависимости: bun install
-3. Настроить .env (DATABASE_URL, JWT_SECRET)
-4. Применить миграции: bun prisma migrate deploy
-5. Запустить: bun start
+cd gis-app-back
 
 ## Первый запуск
-- Создать супер-админа: bun run db:seed:admin admin пароль "ФИО"
+
+# Установить зависимости
+bun install
+
+# Сгенерировать Prisma Client
+bun run db:generate
+
+# Настроить .env (DATABASE_URL, JWT_SECRET)
+
+# Подключиться к PostgreSQL и выполнить:
+CREATE DATABASE braslav_gis;
+
+# Применить все миграции
+bun run db:deploy
+
+# Создать Супер-Админа:
+bun run db:seed:admin <логин> <пароль> "ФИО"
+Пример: bun run db:seed:admin admin SuperPass123 "Супер Администратор"
+
+# Импорт геоданных (обязательно! по этим данным из data/ .geojson будут отрисовываться точки на карте)
+bun run db:seed:geo
+
+# Запустить 
+bun start / bun run dev
 
 bun prisma studio  - проверка БД
 
 
 # Фронтенд ГИС Браславские озера
 
-## Требования
-- Node.js 18+ или Bun
-- NPM или Bun
-
 ## Установка
 1. Распаковать архив
 2. bun install
-3. Создать .env:
+3. Создать .env (есть .env.example):
    VITE_API_URL=http://localhost:3000/api
 4. bun run build
 5. Разместить папку dist на веб-сервере (Nginx/Apache)

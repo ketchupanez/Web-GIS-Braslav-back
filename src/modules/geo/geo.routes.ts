@@ -7,17 +7,11 @@ import { AuditService } from '../audit/audit.service';
 const router = Router();
 const service = new GeoService();
 
-// ==========================================
-// ОЗЕРА
-// ==========================================
-
-// Публичный: получить все озера (GeoJSON для карты)
 router.get('/lakes', async (req, res) => {
   const data = await service.getLakes();
   res.json(data);
 });
 
-// Публичный: получить одно озеро
 router.get('/lakes/:id', async (req, res) => {
   const lake = await prisma.lake.findUnique({
     where: { id: parseInt(req.params.id) }
@@ -30,10 +24,10 @@ router.get('/lakes/:id', async (req, res) => {
   res.json(lake);
 });
 
-// Защищенный: обновить озеро
 router.patch('/lakes/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, areaHa, center } = req.body;
+    const { name, areaHa, area_ha, center } = req.body;
+    const finalAreaHa = areaHa !== undefined ? areaHa : (area_ha !== undefined ? (area_ha ? parseFloat(area_ha) : null) : undefined);
     
     const oldLake = await prisma.lake.findUnique({
       where: { id: parseInt(req.params.id) }
@@ -43,9 +37,11 @@ router.patch('/lakes/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUP
       return res.status(404).json({ message: 'Озеро не найдено' });
     }
     
-    const updateData: any = { name, areaHa };
+    const updateData: any = { 
+      name, 
+      areaHa: finalAreaHa 
+    };
     
-    // Если пришли новые координаты центра
     if (center && Array.isArray(center)) {
       updateData.center = center;
       updateData.geometry = {
@@ -58,8 +54,7 @@ router.patch('/lakes/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUP
       where: { id: parseInt(req.params.id) },
       data: updateData
     });
-    
-    // Логируем изменение
+
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -79,10 +74,10 @@ router.patch('/lakes/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUP
   }
 });
 
-// Защищенный: создать новое озеро
 router.post('/lakes', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, areaHa, center } = req.body;
+    const { name, areaHa, area_ha, center } = req.body;
+    const finalAreaHa = areaHa !== undefined ? areaHa : (area_ha ? parseFloat(area_ha) : null);
     
     if (!name || !center || !Array.isArray(center)) {
       return res.status(400).json({ message: 'Необходимо указать название и координаты центра' });
@@ -91,7 +86,7 @@ router.post('/lakes', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_AD
     const lake = await prisma.lake.create({
       data: {
         name,
-        areaHa,
+        areaHa: finalAreaHa,
         center,
         geometry: {
           type: 'Point',
@@ -100,7 +95,6 @@ router.post('/lakes', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_AD
       }
     });
     
-    // Логируем создание
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -118,7 +112,6 @@ router.post('/lakes', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_AD
   }
 });
 
-// Защищенный: удалить озеро (только SUPER_ADMIN)
 router.delete('/lakes/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const lake = await prisma.lake.findUnique({
@@ -133,7 +126,6 @@ router.delete('/lakes/:id', authenticate, requireRole('SUPER_ADMIN'), async (req
       where: { id: parseInt(req.params.id) }
     });
     
-    // Логируем удаление
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -151,17 +143,54 @@ router.delete('/lakes/:id', authenticate, requireRole('SUPER_ADMIN'), async (req
   }
 });
 
-// ==========================================
-// РОДНИКИ
-// ==========================================
+router.get('/lakes/:id/related-data', async (req, res) => {
+  try {
+    const lakeId = parseInt(req.params.id);
+    
+    const tables = await prisma.dynamicTable.findMany({
+      where: {
+        linkedToObjects: true,
+        objectType: 'LAKE',
+      },
+      include: {
+        records: {
+          where: { lakeId },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
 
-// Публичный: получить все родники (GeoJSON для карты)
+    const result: Record<string, any[]> = {};
+    
+    for (const table of tables) {
+      if (table.records.length > 0) {
+        result[table.name] = table.records.map(record => {
+          const data = record.data as Record<string, any> || {};
+          return {
+            id: record.id,
+            ...data,
+            date: record.date,
+            year: record.year,
+            createdAt: record.createdAt,
+          };
+        });
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching lake related data:', error);
+    res.status(500).json({ message: 'Ошибка загрузки связанных данных' });
+  }
+});
+
+// Родники
+
 router.get('/springs', async (req, res) => {
   const data = await service.getSprings();
   res.json(data);
 });
 
-// Публичный: получить один родник
 router.get('/springs/:id', async (req, res) => {
   const spring = await prisma.spring.findUnique({
     where: { id: parseInt(req.params.id) }
@@ -174,7 +203,6 @@ router.get('/springs/:id', async (req, res) => {
   res.json(spring);
 });
 
-// Защищенный: создать новый родник
 router.post('/springs', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, coordinates, riverId } = req.body;
@@ -195,7 +223,6 @@ router.post('/springs', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_
       }
     });
     
-    // Логируем создание
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -213,7 +240,6 @@ router.post('/springs', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_
   }
 });
 
-// Защищенный: обновить родник
 router.patch('/springs/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, coordinates, riverId } = req.body;
@@ -228,7 +254,6 @@ router.patch('/springs/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'S
     
     const updateData: any = { name, riverId: riverId ? parseInt(riverId) : null };
     
-    // Если пришли новые координаты
     if (coordinates && Array.isArray(coordinates)) {
       updateData.coordinates = coordinates;
       updateData.geometry = {
@@ -242,7 +267,6 @@ router.patch('/springs/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'S
       data: updateData
     });
     
-    // Логируем изменение
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -262,7 +286,6 @@ router.patch('/springs/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'S
   }
 });
 
-// Защищенный: удалить родник (только SUPER_ADMIN)
 router.delete('/springs/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const spring = await prisma.spring.findUnique({
@@ -277,7 +300,6 @@ router.delete('/springs/:id', authenticate, requireRole('SUPER_ADMIN'), async (r
       where: { id: parseInt(req.params.id) }
     });
     
-    // Логируем удаление
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -295,17 +317,59 @@ router.delete('/springs/:id', authenticate, requireRole('SUPER_ADMIN'), async (r
   }
 });
 
-// ==========================================
-// РЕКИ
-// ==========================================
+router.get('/springs/:id/related-data', async (req, res) => {
+  try {
+    const springId = parseInt(req.params.id);
+    
+    const tables = await prisma.dynamicTable.findMany({
+      where: {
+        linkedToObjects: true,
+        objectType: 'SPRING',
+      },
+      include: {
+        records: {
+          where: { springId },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
 
-// Публичный: получить все реки (GeoJSON с сегментами для карты)
+    const result: Record<string, any[]> = {};
+    
+    for (const table of tables) {
+      if (table.records.length > 0) {
+        result[table.name] = table.records.map(record => {
+          const data = record.data as Record<string, any> || {};
+          return {
+            id: record.id,
+            ...data,
+            date: record.date,
+            year: record.year,
+            createdAt: record.createdAt,
+          };
+        });
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching spring related data:', error);
+    res.status(500).json({ message: 'Ошибка загрузки связанных данных' });
+  }
+});
+
+// Реки
+
 router.get('/rivers', async (req, res) => {
   const data = await service.getRivers();
   res.json(data);
 });
 
-// Публичный: получить одну реку (с сегментами)
+router.get('/rivers-list', async (req, res) => {
+  const data = await service.getRiversList();
+  res.json(data);
+});
+
 router.get('/rivers/:id', async (req, res) => {
   const river = await prisma.river.findUnique({
     where: { id: parseInt(req.params.id) },
@@ -319,7 +383,6 @@ router.get('/rivers/:id', async (req, res) => {
   res.json(river);
 });
 
-// Защищенный: создать новую реку с сегментами
 router.post('/rivers', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, segments } = req.body;
@@ -327,14 +390,12 @@ router.post('/rivers', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_A
     if (!name) {
       return res.status(400).json({ message: 'Необходимо указать название реки' });
     }
-    
-    // Создаём реку и сегменты в транзакции
+
     const river = await prisma.$transaction(async (tx) => {
       const newRiver = await tx.river.create({
         data: { name }
       });
       
-      // Если есть сегменты с геометрией — создаём их
       if (segments && Array.isArray(segments) && segments.length > 0) {
         await tx.riverSegment.createMany({
           data: segments.map((seg: any, index: number) => ({
@@ -348,7 +409,6 @@ router.post('/rivers', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_A
       return newRiver;
     });
     
-    // Логируем создание
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -366,7 +426,6 @@ router.post('/rivers', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_A
   }
 });
 
-// Защищенный: обновить реку (название меняется у ВСЕХ сегментов!)
 router.patch('/rivers/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name } = req.body;
@@ -385,7 +444,6 @@ router.patch('/rivers/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SU
       data: { name }
     });
     
-    // Логируем изменение
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -405,7 +463,6 @@ router.patch('/rivers/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SU
   }
 });
 
-// Обновить название реки по имени (для группового редактирования всех сегментов)
 router.patch('/rivers/by-name/:name', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const oldName = req.params.name;
@@ -430,7 +487,6 @@ router.patch('/rivers/by-name/:name', authenticate, requireRole('ADMIN', 'MAIN_A
     
     const segmentsCount = await prisma.riverSegment.count({ where: { riverId: river.id } });
     
-    // Логируем изменение
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -455,7 +511,6 @@ router.patch('/rivers/by-name/:name', authenticate, requireRole('ADMIN', 'MAIN_A
   }
 });
 
-// Защищенный: удалить реку (только SUPER_ADMIN) — каскадно удалятся все сегменты
 router.delete('/rivers/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const river = await prisma.river.findUnique({
@@ -471,7 +526,6 @@ router.delete('/rivers/:id', authenticate, requireRole('SUPER_ADMIN'), async (re
       where: { id: parseInt(req.params.id) }
     });
     
-    // Логируем удаление
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -489,9 +543,48 @@ router.delete('/rivers/:id', authenticate, requireRole('SUPER_ADMIN'), async (re
   }
 });
 
-// ==========================================
-// ИНФРАСТРУКТУРА
-// ==========================================
+router.get('/rivers/:id/related-data', async (req, res) => {
+  try {
+    const riverId = parseInt(req.params.id);
+    
+    const tables = await prisma.dynamicTable.findMany({
+      where: {
+        linkedToObjects: true,
+        objectType: 'RIVER',
+      },
+      include: {
+        records: {
+          where: { riverId },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    const result: Record<string, any[]> = {};
+    
+    for (const table of tables) {
+      if (table.records.length > 0) {
+        result[table.name] = table.records.map(record => {
+          const data = record.data as Record<string, any> || {};
+          return {
+            id: record.id,
+            ...data,
+            date: record.date,
+            year: record.year,
+            createdAt: record.createdAt,
+          };
+        });
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching river related data:', error);
+    res.status(500).json({ message: 'Ошибка загрузки связанных данных' });
+  }
+});
+
+// Инфраструктура
 
 // Базы отдыха
 router.get('/accommodation', async (req, res) => {
@@ -511,7 +604,6 @@ router.get('/accommodation/:id', async (req, res) => {
   res.json(item);
 });
 
-// Создать базу отдыха
 router.post('/accommodation', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, type, address, coordinates } = req.body;
@@ -523,7 +615,7 @@ router.post('/accommodation', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', '
     const item = await prisma.accommodation.create({
       data: {
         name,
-        type: type || null,  // Просто строка, не enum
+        type: type || null,
         address,
         coordinates,
         geometry: {
@@ -533,7 +625,6 @@ router.post('/accommodation', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', '
       }
     });
     
-    // Логируем создание
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -578,7 +669,6 @@ router.patch('/accommodation/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMI
       data: updateData
     });
     
-    // Логируем изменение
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -598,7 +688,6 @@ router.patch('/accommodation/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMI
   }
 });
 
-// Удалить базу отдыха (только SUPER_ADMIN)
 router.delete('/accommodation/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -619,7 +708,6 @@ router.delete('/accommodation/:id', authenticate, requireRole('SUPER_ADMIN'), as
       where: { id }
     });
     
-    // Логируем удаление
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -637,17 +725,54 @@ router.delete('/accommodation/:id', authenticate, requireRole('SUPER_ADMIN'), as
   }
 });
 
-// ==========================================
-// ТУРСТОЯНКИ
-// ==========================================
+router.get('/accommodation/:id/related-data', async (req, res) => {
+  try {
+    const accommodationId = parseInt(req.params.id);
+    
+    const tables = await prisma.dynamicTable.findMany({
+      where: {
+        linkedToObjects: true,
+        objectType: 'ACCOMMODATION',
+      },
+      include: {
+        records: {
+          where: { accommodationId },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
 
-// Публичный: получить все турстоянки (GeoJSON для карты)
+    const result: Record<string, any[]> = {};
+    
+    for (const table of tables) {
+      if (table.records.length > 0) {
+        result[table.name] = table.records.map(record => {
+          const data = record.data as Record<string, any> || {};
+          return {
+            id: record.id,
+            ...data,
+            date: record.date,
+            year: record.year,
+            createdAt: record.createdAt,
+          };
+        });
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching accommodation related data:', error);
+    res.status(500).json({ message: 'Ошибка загрузки связанных данных' });
+  }
+});
+
+// Турстоянки
+
 router.get('/tourist-stops', async (req, res) => {
   const data = await service.getTouristStops();
   res.json(data);
 });
 
-// Публичный: получить одну турстоянку
 router.get('/tourist-stops/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   
@@ -666,7 +791,6 @@ router.get('/tourist-stops/:id', async (req, res) => {
   res.json(item);
 });
 
-// Создать турстоянку
 router.post('/tourist-stops', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, coordinates, description } = req.body;
@@ -686,7 +810,6 @@ router.post('/tourist-stops', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', '
       }
     });
     
-    // Логируем создание
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -704,7 +827,6 @@ router.post('/tourist-stops', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', '
   }
 });
 
-// Обновить турстоянку
 router.patch('/tourist-stops/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -738,7 +860,6 @@ router.patch('/tourist-stops/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMI
       data: updateData
     });
     
-    // Логируем изменение
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -758,7 +879,6 @@ router.patch('/tourist-stops/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMI
   }
 });
 
-// Удалить турстоянку (только SUPER_ADMIN)
 router.delete('/tourist-stops/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -778,8 +898,7 @@ router.delete('/tourist-stops/:id', authenticate, requireRole('SUPER_ADMIN'), as
     await prisma.touristStop.delete({
       where: { id }
     });
-    
-    // Логируем удаление
+
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -797,17 +916,54 @@ router.delete('/tourist-stops/:id', authenticate, requireRole('SUPER_ADMIN'), as
   }
 });
 
-// ==========================================
-// ТУРОРГАНИЗАТОРЫ
-// ==========================================
+router.get('/tourist-stops/:id/related-data', async (req, res) => {
+  try {
+    const touristStopId = parseInt(req.params.id);
+    
+    const tables = await prisma.dynamicTable.findMany({
+      where: {
+        linkedToObjects: true,
+        objectType: 'TOURIST_STOP',
+      },
+      include: {
+        records: {
+          where: { touristStopId },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
 
-// Публичный: получить всех турорганизаторов (GeoJSON для карты)
+    const result: Record<string, any[]> = {};
+    
+    for (const table of tables) {
+      if (table.records.length > 0) {
+        result[table.name] = table.records.map(record => {
+          const data = record.data as Record<string, any> || {};
+          return {
+            id: record.id,
+            ...data,
+            date: record.date,
+            year: record.year,
+            createdAt: record.createdAt,
+          };
+        });
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching tourist stop related data:', error);
+    res.status(500).json({ message: 'Ошибка загрузки связанных данных' });
+  }
+});
+
+// Турорганизаторы
+
 router.get('/tourism-organizers', async (req, res) => {
   const data = await service.getTourismOrganizers();
   res.json(data);
 });
 
-// Публичный: получить одного турорганизатора
 router.get('/tourism-organizers/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   
@@ -826,7 +982,6 @@ router.get('/tourism-organizers/:id', async (req, res) => {
   res.json(item);
 });
 
-// Создать турорганизатора
 router.post('/tourism-organizers', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, type, address, coordinates } = req.body;
@@ -848,7 +1003,6 @@ router.post('/tourism-organizers', authenticate, requireRole('ADMIN', 'MAIN_ADMI
       }
     });
     
-    // Логируем создание
     const audit = new AuditService();
     await audit.logCreate({
       userId: req.user!.userId,
@@ -866,7 +1020,6 @@ router.post('/tourism-organizers', authenticate, requireRole('ADMIN', 'MAIN_ADMI
   }
 });
 
-// Обновить турорганизатора
 router.patch('/tourism-organizers/:id', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -904,7 +1057,6 @@ router.patch('/tourism-organizers/:id', authenticate, requireRole('ADMIN', 'MAIN
       data: updateData
     });
     
-    // Логируем изменение
     const audit = new AuditService();
     await audit.logUpdate({
       userId: req.user!.userId,
@@ -924,7 +1076,6 @@ router.patch('/tourism-organizers/:id', authenticate, requireRole('ADMIN', 'MAIN
   }
 });
 
-// Удалить турорганизатора (только SUPER_ADMIN)
 router.delete('/tourism-organizers/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -945,7 +1096,6 @@ router.delete('/tourism-organizers/:id', authenticate, requireRole('SUPER_ADMIN'
       where: { id }
     });
     
-    // Логируем удаление
     const audit = new AuditService();
     await audit.logDelete({
       userId: req.user!.userId,
@@ -960,6 +1110,47 @@ router.delete('/tourism-organizers/:id', authenticate, requireRole('SUPER_ADMIN'
   } catch (error) {
     console.error('Error deleting tourism organizer:', error);
     res.status(500).json({ message: 'Ошибка удаления' });
+  }
+});
+
+router.get('/tourism-organizers/:id/related-data', async (req, res) => {
+  try {
+    const organizerId = parseInt(req.params.id);
+    
+    const tables = await prisma.dynamicTable.findMany({
+      where: {
+        linkedToObjects: true,
+        objectType: 'ORGANIZER',
+      },
+      include: {
+        records: {
+          where: { organizerId },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    const result: Record<string, any[]> = {};
+    
+    for (const table of tables) {
+      if (table.records.length > 0) {
+        result[table.name] = table.records.map(record => {
+          const data = record.data as Record<string, any> || {};
+          return {
+            id: record.id,
+            ...data,
+            date: record.date,
+            year: record.year,
+            createdAt: record.createdAt,
+          };
+        });
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching organizer related data:', error);
+    res.status(500).json({ message: 'Ошибка загрузки связанных данных' });
   }
 });
 

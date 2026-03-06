@@ -4,7 +4,7 @@ import { prisma } from '../../shared/database';
 
 const router = Router();
 
-router.get('/logs', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.get('/logs', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN'), async (_req, res) => {
   const logs = await prisma.auditLog.findMany({
     take: 100,
     orderBy: { createdAt: 'desc' },
@@ -19,9 +19,9 @@ router.get('/logs', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMI
     id: log.id,
     user: log.user,
     action: log.action,
-    tableRef: log.tableRef,      // ← исправлено
+    tableRef: log.tableRef,
     tableName: log.tableName,
-    recordId: log.recordId,      // ← исправлено
+    recordId: log.recordId,
     recordName: log.recordName,
     description: log.description,
     createdAt: log.createdAt,

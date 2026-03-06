@@ -211,6 +211,8 @@
       {"type": "Feature", "properties": {"id": 200, "name": "оз. Шилово", "area_ha": 18.1}, "geometry": {"type": "Point", "coordinates": [27.084635, 55.500691]}},
       {"type": "Feature", "properties": {"id": 201, "name": "оз. Шлапуте", "area_ha": 6.0}, "geometry": {"type": "Point", "coordinates": [26.571644, 55.501393]}},
       {"type": "Feature", "properties": {"id": 202, "name": "оз. Янели", "area_ha": 19.0}, "geometry": {"type": "Point", "coordinates": [27.428645, 55.742706]}},
-      {"type": "Feature", "properties": {"id": 203, "name": "оз. Янка", "area_ha": 21.4}, "geometry": {"type": "Point", "coordinates": [27.009088, 55.436729]}}
+      {"type": "Feature", "properties": {"id": 203, "name": "оз. Янка", "area_ha": 21.4}, "geometry": {"type": "Point", "coordinates": [27.009088, 55.436729]}},
+      {"type": "Feature", "properties": {"id": 204, "name": "оз. Волос Южный", "area_ha": null}, "geometry": {"type": "Point", "coordinates": [27.129022, 55.749675]}},
+      {"type": "Feature", "properties": {"id": 205, "name": "оз. Волос Северный", "area_ha": null}, "geometry": {"type": "Point", "coordinates": [27.138333, 55.730556]}}
     ]
   }

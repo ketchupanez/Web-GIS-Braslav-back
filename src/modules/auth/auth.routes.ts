@@ -33,7 +33,6 @@ router.get('/check-login', async (req, res) => {
       });
     }
     
-    // Case-insensitive поиск (чтобы Admin и admin считались одинаковыми)
     const exists = await prisma.user.findFirst({ 
       where: { 
         login: { equals: login, mode: 'insensitive' } 

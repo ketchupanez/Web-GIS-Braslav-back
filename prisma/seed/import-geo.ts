@@ -4,7 +4,6 @@ import * as path from 'path';
 
 const prisma = new PrismaClient();
 
-// Очистка строки от "оз. № X" для получения чистого названия
 const cleanLakeName = (name: string): string => {
   return name.replace(/оз\.\s*№\s*\d+\s*\(?([^)]*)\)?/i, '$1').trim() || name;
 };
@@ -36,7 +35,7 @@ async function importLakes() {
     });
   }
 
-  console.log(`✅ Импортировано озер: ${geojson.features.length}`);
+  console.log(`Импортировано озер: ${geojson.features.length}`);
 }
 
 // Импорт родников
@@ -64,7 +63,7 @@ async function importSprings() {
     });
   }
 
-  console.log(`✅ Импортировано родников: ${geojson.features.length}`);
+  console.log(`Импортировано родников: ${geojson.features.length}`);
 }
 
 // Импорт баз отдыха
@@ -96,7 +95,7 @@ async function importAccommodation() {
     });
   }
 
-  console.log(`✅ Импортировано баз отдыха: ${geojson.features.length}`);
+  console.log(`Импортировано баз отдыха: ${geojson.features.length}`);
 }
 
 // Импорт турстоянок
@@ -124,7 +123,7 @@ async function importTouristStops() {
     });
   }
 
-  console.log(`✅ Импортировано турстоянок: ${geojson.features.length}`);
+  console.log(`Импортировано турстоянок: ${geojson.features.length}`);
 }
 
 // Импорт турорганизаторов
@@ -154,7 +153,7 @@ async function importTourismOrganizers() {
     });
   }
 
-  console.log(`✅ Импортировано турорганизаторов: ${geojson.features.length}`);
+  console.log(`Импортировано турорганизаторов: ${geojson.features.length}`);
 }
 
 // Импорт рек (сегменты)
@@ -163,7 +162,6 @@ async function importRivers() {
   const raw = fs.readFileSync(filePath, 'utf-8');
   const geojson = JSON.parse(raw);
 
-  // Группируем сегменты по имени реки
   const riverGroups = new Map<string, any[]>();
   
   for (const feature of geojson.features) {
@@ -175,7 +173,6 @@ async function importRivers() {
   }
 
   for (const [riverName, segments] of riverGroups) {
-    // Создаем или получаем реку
     const river = await prisma.river.upsert({
       where: { name: riverName },
       update: {},
@@ -184,10 +181,8 @@ async function importRivers() {
       },
     });
 
-    // Импортируем сегменты
     let validSegmentIndex = 0;
     for (const segment of segments) {
-      // Пропускаем если нет geometry
       if (!segment.geometry || !segment.geometry.coordinates) {
         console.warn(`⏭️ Пропуск сегмента без geometry: ${segment.properties.id || 'no-id'}`);
         continue;
@@ -195,7 +190,6 @@ async function importRivers() {
       
       const coords = segment.geometry.coordinates;
       
-      // Пропускаем если это точка (родник) вместо линии
       if (!Array.isArray(coords) || coords.length === 0 || !Array.isArray(coords[0])) {
         console.warn(`⏭️ Пропуск точки (не линия): ${segment.properties.id || 'no-id'}`);
         continue;
@@ -203,7 +197,6 @@ async function importRivers() {
 
       await prisma.riverSegment.upsert({
         where: { 
-          // Используем комбинацию riverId + order как уникальный ключ
           id: segment.properties.id || `${river.id}_${validSegmentIndex}` 
         },
         update: {
@@ -221,11 +214,10 @@ async function importRivers() {
     }
   }
 
-  console.log(`✅ Импортировано рек: ${riverGroups.size}`);
+  console.log(`Импортировано рек: ${riverGroups.size}`);
 }
 
 async function main() {
-  console.log('🚀 Начинаем импорт GeoJSON...\n');
   
   await importLakes();
   await importSprings();
@@ -234,12 +226,12 @@ async function main() {
   await importTourismOrganizers();
   await importRivers();
   
-  console.log('\n✨ Импорт завершен!');
+  console.log('\n Импорт завершен.');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Ошибка:', e);
+    console.error('Ошибка:', e);
     process.exit(1);
   })
   .finally(async () => {

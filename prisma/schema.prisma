@@ -42,7 +42,7 @@ enum DepthType {
   MIDDLE
 }
 
-// ==================== USERS ====================
+// Юзеры
 model User {
   id        String   @id @default(uuid())
   login     String   @unique
@@ -56,17 +56,18 @@ model User {
 
   dynamicTables  DynamicTable[]
   dynamicData    DynamicRecord[]
-  auditLogs   AuditLog[]
+  auditLogs      AuditLog[]
+  charts         ChartConfig[]
   
   @@map("users")
 }
 
-// ==================== ИНФРАСТРУКТУРА ====================
+// Инфраструктура
 model Accommodation {
   id          Int               @id @default(autoincrement())
   name        String            @unique
   type        String?
-  geometry    Json              // GeoJSON Point
+  geometry    Json              
   coordinates Float[]           // [lon, lat]
 
   address     String?
@@ -84,7 +85,7 @@ model Accommodation {
 model TouristStop {
   id          Int       @id @default(autoincrement())
   name        String    @unique
-  geometry    Json      // GeoJSON Point
+  geometry    Json      
   coordinates Float[]   // [lon, lat]
 
   createdAt   DateTime  @default(now())
@@ -99,7 +100,7 @@ model TourismOrganizer {
   id          Int            @id @default(autoincrement())
   name        String         @unique
   type        String?
-  geometry    Json           // GeoJSON Point
+  geometry    Json           
   coordinates Float[]        // [lon, lat]
 
   address     String?
@@ -112,11 +113,11 @@ model TourismOrganizer {
   @@map("tourism_organizers")
 }
 
-// ==================== ВОДНЫЕ ОБЪЕКТЫ ====================
+// Водные объекты
 model Lake {
   id                   Int       @id @default(autoincrement())
   name                 String    @unique
-  geometry             Json      // GeoJSON Polygon или MultiPolygon
+  geometry             Json      
   center               Float[]   // [lon, lat]
 
   areaHa               Float?    @map("area_ha")
@@ -125,6 +126,7 @@ model Lake {
   updatedAt            DateTime? @updatedAt
   
   dynamicRecords DynamicRecord[]
+  charts ChartConfig[]
   
   @@map("lakes")
 }
@@ -140,6 +142,7 @@ model River {
   springs     Spring[]
   
   dynamicRecords DynamicRecord[]
+  charts ChartConfig[]
   
   @@map("rivers")
 }
@@ -170,11 +173,12 @@ model Spring {
   updatedAt   DateTime? @updatedAt
   
   dynamicRecords DynamicRecord[]
+  charts ChartConfig[]
   
   @@map("springs")
 }
 
-// ==================== ДИНАМИЧЕСКИЕ ТАБЛИЦЫ ====================
+// Пользовательские таблицы (динамические)
 model DynamicTable {
   id            String   @id @default(uuid())
   name          String
@@ -193,13 +197,14 @@ model DynamicTable {
   linkedToObjects Boolean @default(false)
   objectType      ObjectType?
   
-  createdBy     String   @map("created_by")
-  user          User     @relation(fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdBy       String   @map("created_by")
+  lastAccessedAt  DateTime? @map("last_accessed_at")
+  lastAccessedBy  String?   @map("last_accessed_by")
+  user            User     @relation(fields: [createdBy], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   
   records       DynamicRecord[]
-  charts        ChartConfig[]
   
   @@map("dynamic_tables")
 }
@@ -209,7 +214,6 @@ model DynamicRecord {
   tableId     String   @map("table_id")
   table       DynamicTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
   
-  // Привязка к системным объектам — теперь Int!
   lakeId      Int?     @map("lake_id")
   riverId     Int?     @map("river_id")
   springId    Int?     @map("spring_id")
@@ -217,18 +221,18 @@ model DynamicRecord {
   touristStopId   Int? @map("tourist_stop_id")
   organizerId     Int? @map("organizer_id")
   
-  lake        Lake?    @relation(fields: [lakeId], references: [id])
-  river       River?   @relation(fields: [riverId], references: [id])
-  spring      Spring?  @relation(fields: [springId], references: [id])
-  accommodation Accommodation? @relation(fields: [accommodationId], references: [id])
-  touristStop TouristStop? @relation(fields: [touristStopId], references: [id])
-  organizer   TourismOrganizer? @relation(fields: [organizerId], references: [id])
+  lake            Lake?             @relation(fields: [lakeId], references: [id])
+  river           River?            @relation(fields: [riverId], references: [id])
+  spring          Spring?           @relation(fields: [springId], references: [id])
+  accommodation   Accommodation?    @relation(fields: [accommodationId], references: [id])
+  touristStop     TouristStop?      @relation(fields: [touristStopId], references: [id])
+  organizer       TourismOrganizer? @relation(fields: [organizerId], references: [id])
   
   data        Json
   year        Int?
   date        DateTime?
   
-  lockedBy    String?  @map("locked_by")
+  lockedBy    String?   @map("locked_by")
   lockedAt    DateTime? @map("locked_at")
   
   createdBy   String   @map("created_by")
@@ -245,30 +249,48 @@ model DynamicRecord {
   @@map("dynamic_records")
 }
 
-// ==================== ГРАФИКИ ====================
+// Графики
 model ChartConfig {
-  id            String   @id @default(uuid())
-  tableId       String   @map("table_id")
-  table         DynamicTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
   
-  title         String
-  type          String
+  name            String
+  description     String?
   
-  xAxis         Json
-  yAxis         Json
+  tableId         String   @map("table_id")
   
-  filters       Json?
+  lakeId          Int?     @map("lake_id")
+  riverId         Int?     @map("river_id")
+  springId        Int?     @map("spring_id")
+  accommodationId Int?     @map("accommodation_id")
+  touristStopId   Int?     @map("tourist_stop_id")
+  organizerId     Int?     @map("organizer_id")
   
-  showInPopup   Boolean  @default(false)
-  popupOrder    Int      @default(0)
+  year            Int?
+  objectType      String   @map("object_type")
   
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  sources         Json[]
+  indicators      Json[]
+  chartType       String   @default("stackedBar") @map("chart_type")
   
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  lake            Lake?    @relation(fields: [lakeId], references: [id])
+  river           River?   @relation(fields: [riverId], references: [id])
+  spring          Spring?  @relation(fields: [springId], references: [id])
+  creator         User     @relation(fields: [createdBy], references: [id])
+  
+  @@index([lakeId])
+  @@index([riverId])
+  @@index([springId])
+  @@index([year])
+  @@index([objectType])
+  @@index([createdBy])
   @@map("chart_configs")
 }
 
-// ==================== АУДИТ ЛОГОВ ====================
+// Логи
 model AuditLog {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
@@ -292,4 +314,14 @@ model AuditLog {
   @@index([tableRef])
   @@index([recordId])
   @@map("audit_logs")
+}
+
+// Настройка резервирования БД
+model AppSettings {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("app_settings")
 }

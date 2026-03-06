@@ -53,6 +53,24 @@ export class GeoService {
     };
   }
 
+  async getRiversList() {
+    const rivers = await prisma.river.findMany({
+      orderBy: { name: 'asc' },
+    });
+  
+    return {
+      type: 'FeatureCollection',
+      features: rivers.map((river) => ({
+        type: 'Feature',
+        properties: {
+          id: river.id,
+          name: river.name,
+        },
+        geometry: null,
+      })),
+    };
+  }
+
   async getAccommodation() {
     const items = await prisma.accommodation.findMany();
     return {
@@ -62,7 +80,7 @@ export class GeoService {
         properties: {
           id: item.id,
           name: item.name,
-          type: item.type?.toLowerCase() || null,  // ← исправлено: проверка на null
+          type: item.type?.toLowerCase() || null,
           address: item.address,
           coordinates: item.coordinates,
         },

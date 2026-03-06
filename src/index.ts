@@ -11,10 +11,12 @@ import geoRoutes from './modules/geo/geo.routes';
 import { authenticate } from './shared/middleware/auth';
 import tablesRoutes from './modules/tables/tables.routes';
 import importRoutes from './modules/import/import.routes';
+import chartsRoutes from './modules/charts/charts.routes';
+import backupRoutes from './modules/backup/backup.routes';
+import { AutoBackupService } from './modules/backup/auto-backup.service';
 
 const app = express();
 
-// Middleware — ВАЖНО: порядок имеет значение!
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -23,17 +25,17 @@ app.use(cors({
   credentials: true
 }));
 
-// JSON parser с лимитом для больших запросов (Excel файлы)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Роуты
 app.use('/api/users', usersRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/geo', geoRoutes);
 app.use('/api/tables', tablesRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/charts', chartsRoutes);
+app.use('/api/backups', backupRoutes);
 app.get('/api/admin/stats', authenticate, async (req, res) => {
   try {
     const [
@@ -54,7 +56,6 @@ app.get('/api/admin/stats', authenticate, async (req, res) => {
       prisma.user.count(),
     ]);
 
-    // Уникальные реки
     const uniqueRivers = await prisma.river.count();
 
     res.json({
@@ -73,22 +74,21 @@ app.get('/api/admin/stats', authenticate, async (req, res) => {
   }
 });
 
-// Error handling
 app.use(errorHandler);
 
-// 404
 app.use((req, res) => {
   res.status(404).json({ message: 'Not found' });
 });
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+
+  await AutoBackupService.init();
 });
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   await prisma.$disconnect();
   process.exit(0);

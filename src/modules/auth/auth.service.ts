@@ -24,7 +24,7 @@ export class AuthService {
     const token = jwt.sign(
       { userId: user.id, login: user.login, role: user.role },
       JWT_SECRET,
-      { expiresIn: '24h' } // Для простоты 24ч, потом можно сделать refresh tokens
+      { expiresIn: '24h' } // Потом сделать refresh tokens?
     );
 
     return {
@@ -56,7 +56,7 @@ export class AuthService {
         password: hashedPassword,
         fullName: data.fullName,
         position: data.position,
-        role: 'PENDING' // По умолчанию ожидает подтверждения
+        role: 'PENDING'
       }
     });
 

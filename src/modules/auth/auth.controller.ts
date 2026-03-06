@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
 import { loginSchema, registerSchema, changePasswordSchema } from './auth.validation';
-import { ZodError } from 'zod';
+import { prisma } from '../../shared/database';
 
 const authService = new AuthService();
 
@@ -28,7 +28,7 @@ export class AuthController {
 
   async changePassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user?.userId; // Добавим middleware позже
+      const userId = req.user?.userId;
       if (!userId) {
         return res.status(401).json({ message: 'Не авторизован' });
       }
@@ -42,6 +42,16 @@ export class AuthController {
   }
 
   async getMe(req: Request, res: Response) {
-    res.json({ user: req.user });
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ message: 'Не авторизован' });
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, login: true, fullName: true, role: true, position: true }
+    });
+    
+    if (!user) return res.status(404).json({ message: 'Не найден' });
+    
+    res.json({ user: { ...user, role: user.role.toLowerCase() } });
   }
 }
