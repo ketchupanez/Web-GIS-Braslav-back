@@ -12,7 +12,7 @@ export class AutoBackupService {
     await this.loadSettings();
     
     if (!this.settings?.autoBackupEnabled) {
-      console.log('⏸Автобэкапы отключены в настройках');
+      console.log('Автобэкапы отключены в настройках');
       return;
     }
 

@@ -20,9 +20,9 @@ bun run db:deploy
 
 # Создать Супер-Админа:
 bun run db:seed:admin <логин> <пароль> "ФИО"
-Пример: bun run db:seed:admin admin SuperPass123 "Супер Администратор"
+Пример: bun run db:seed:admin SuperAdmin123 SuperPass123 "Супер Администратор"
 
-# Импорт геоданных (обязательно! по этим данным из data/ .geojson будут отрисовываться точки на карте)
+# Импорт геоданных
 bun run db:seed:geo
 
 # Запустить 

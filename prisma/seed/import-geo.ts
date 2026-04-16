@@ -184,14 +184,14 @@ async function importRivers() {
     let validSegmentIndex = 0;
     for (const segment of segments) {
       if (!segment.geometry || !segment.geometry.coordinates) {
-        console.warn(`⏭️ Пропуск сегмента без geometry: ${segment.properties.id || 'no-id'}`);
+        console.warn(`Пропуск сегмента без geometry: ${segment.properties.id || 'no-id'}`);
         continue;
       }
       
       const coords = segment.geometry.coordinates;
       
       if (!Array.isArray(coords) || coords.length === 0 || !Array.isArray(coords[0])) {
-        console.warn(`⏭️ Пропуск точки (не линия): ${segment.properties.id || 'no-id'}`);
+        console.warn(`Пропуск точки: ${segment.properties.id || 'no-id'}`);
         continue;
       }
 

@@ -8,7 +8,7 @@ async function main() {
 
   if (!login || !password || !fullName) {
     console.log('Использование: bun ts-node prisma/seed/create-super-admin.ts <login> <password> <fullName>');
-    console.log('Пример: bun ts-node prisma/seed/create-super-admin.ts admin123 SuperPassword123 "Иванов Иван Иванович"');
+    console.log('Пример: bun ts-node prisma/seed/create-super-admin.ts SuperAdmin123 SuperPassword123 "Супер Администратор"');
     process.exit(1);
   }
 
