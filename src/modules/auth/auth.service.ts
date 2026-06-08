@@ -2,12 +2,15 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../shared/database';
 import { LoginDto, RegisterDto, ChangePasswordDto, AuthResponse } from './auth.types';
+import { loginSchema, registerSchema, changePasswordSchema, superAdminSchema } from './auth.validation';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 const SALT_ROUNDS = 10;
 
 export class AuthService {
   async login(data: LoginDto): Promise<AuthResponse> {
+    loginSchema.parse(data); 
+
     const user = await prisma.user.findUnique({
       where: { login: data.login }
     });
@@ -24,7 +27,7 @@ export class AuthService {
     const token = jwt.sign(
       { userId: user.id, login: user.login, role: user.role },
       JWT_SECRET,
-      { expiresIn: '24h' } // Потом сделать refresh tokens?
+      { expiresIn: '24h' }
     );
 
     return {
@@ -32,7 +35,7 @@ export class AuthService {
         id: user.id,
         login: user.login,
         fullName: user.fullName,
-        role: user.role.toLowerCase(),
+        role: user.role,
         position: user.position
       },
       accessToken: token
@@ -40,6 +43,8 @@ export class AuthService {
   }
 
   async register(data: RegisterDto): Promise<AuthResponse> {
+    registerSchema.parse(data); 
+
     const existingUser = await prisma.user.findUnique({
       where: { login: data.login }
     });
@@ -71,7 +76,7 @@ export class AuthService {
         id: user.id,
         login: user.login,
         fullName: user.fullName,
-        role: user.role.toLowerCase(),
+        role: user.role,
         position: user.position
       },
       accessToken: token
@@ -79,22 +84,13 @@ export class AuthService {
   }
 
   async changePassword(userId: string, data: ChangePasswordDto): Promise<void> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
+    changePasswordSchema.parse(data);
 
-    if (!user) {
-      throw new Error('Пользователь не найден');
-    }
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('Пользователь не найден');
 
-    const isValidPassword = await bcrypt.compare(data.oldPassword, user.password);
-    if (!isValidPassword) {
-      throw new Error('Неверный старый пароль');
-    }
-
-    if (data.newPassword.length < 8) {
-      throw new Error('Новый пароль должен быть минимум 8 символов');
-    }
+    const isValid = await bcrypt.compare(data.oldPassword, user.password);
+    if (!isValid) throw new Error('Неверный старый пароль');
 
     const hashedPassword = await bcrypt.hash(data.newPassword, SALT_ROUNDS);
 
@@ -105,6 +101,8 @@ export class AuthService {
   }
 
   async createSuperAdmin(login: string, password: string, fullName: string): Promise<void> {
+    superAdminSchema.parse({ login, password, fullName });
+
     const existing = await prisma.user.findFirst({
       where: { role: 'SUPER_ADMIN' }
     });

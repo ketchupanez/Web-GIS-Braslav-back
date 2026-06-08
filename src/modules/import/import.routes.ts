@@ -102,7 +102,10 @@ router.post('/preview', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_
     
     const workbook = XLSX.read(data, { type: 'base64' });
     const worksheet = workbook.Sheets[sheetName || workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1,
+      raw: false,
+    }) as any[][];
     
     if (jsonData.length < 2) {
       return res.status(400).json({ message: 'Файл должен содержать заголовки и данные' });
@@ -160,7 +163,10 @@ router.post('/execute', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_
     
     const workbook = XLSX.read(data, { type: 'base64' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1,
+      raw: false,
+    }) as any[][];
     
     if (jsonData.length < 2) {
       return res.status(400).json({ message: 'Файл должен содержать заголовки и данные' });

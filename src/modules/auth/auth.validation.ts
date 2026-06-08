@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// Базовые схемы (переиспользуемые)
+
+
 const loginSchemaBase = z.string()
   .min(5, 'Логин должен содержать минимум 5 символов')
   .max(20, 'Логин не должен превышать 20 символов')
@@ -13,6 +16,19 @@ const passwordSchemaBase = z.string()
   .regex(/[a-z]/, 'Пароль должен содержать хотя бы одну строчную букву')
   .regex(/[0-9]/, 'Пароль должен содержать хотя бы одну цифру');
 
+const fullNameSchemaBase = z.string()
+  .trim()
+  .min(3, 'ФИО должно содержать минимум 3 символа')
+  .max(50, 'ФИО слишком длинное')
+  .regex(/^[а-яА-ЯёЁa-zA-Z\s-]+$/, 'ФИО может содержать только буквы, пробелы и дефисы');
+
+const positionSchemaBase = z.string()
+  .max(50, 'Название должности слишком длинное')
+  .optional()
+  .default('');
+
+// Схемы для эндпоинтов
+
 export const loginSchema = z.object({
   login: loginSchemaBase,
   password: z.string().min(1, 'Введите пароль')
@@ -21,14 +37,8 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   login: loginSchemaBase,
   password: passwordSchemaBase,
-  fullName: z.string()
-    .min(3, 'ФИО должно содержать минимум 3 символа')
-    .max(50, 'ФИО слишком длинное')
-    .regex(/^[а-яА-ЯёЁa-zA-Z\s-]+$/, 'ФИО может содержать только буквы и дефисы'),
-  position: z.string()
-    .max(50, 'Название должности слишком длинное')
-    .optional()
-    .or(z.literal(''))
+  fullName: fullNameSchemaBase,
+  position: positionSchemaBase
 });
 
 export const changePasswordSchema = z.object({
@@ -38,3 +48,17 @@ export const changePasswordSchema = z.object({
   message: 'Новый пароль должен отличаться от старого',
   path: ['newPassword']
 });
+
+export const superAdminSchema = z.object({
+  login: loginSchemaBase,
+  password: passwordSchemaBase,
+  fullName: fullNameSchemaBase
+});
+
+// Типы
+
+
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type SuperAdminInput = z.infer<typeof superAdminSchema>;

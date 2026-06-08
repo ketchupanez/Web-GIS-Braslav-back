@@ -5,6 +5,26 @@ import { AuditService } from '../audit/audit.service';
 
 const router = Router();
 
+const RESERVED_TABLE_NAMES = [
+  'озера', 'озеро',
+  'реки', 'река', 
+  'родники', 'родник',
+  'базы отдыха', 'база отдыха',
+  'турстоянки', 'турстоянка',
+  'турорганизаторы', 'турорганизатор',
+  'lakes', 'lake',
+  'rivers', 'river',
+  'springs', 'spring',
+  'accommodations', 'accommodation',
+  'touriststops', 'touriststop',
+  'organizers', 'organizer',
+];
+
+const isReservedName = (name: string): boolean => {
+  const normalized = name.toLowerCase().trim();
+  return RESERVED_TABLE_NAMES.includes(normalized);
+};
+
 const transliterate = (text: string): string => {
   const map: Record<string, string> = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
@@ -44,6 +64,12 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
       return res.status(400).json({ message: 'Необходимо указать название таблицы' });
     }
     
+    if (isReservedName(name)) {
+      return res.status(400).json({ 
+        message: `Название "${name}" зарезервировано для системной таблицы` 
+      });
+    }
+
     if (!categories && !category) {
       return res.status(400).json({ message: 'Необходимо указать категорию' });
     }
@@ -97,7 +123,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'MAIN_ADMIN', 'SUPER_ADMIN')
     
     let uniqueSlug = finalSlug;
     if (existing) {
-      uniqueSlug = `${finalSlug}-${Date.now().toString(36).slice(-4)}`;
+      uniqueSlug = `${ finalSlug}-${Date.now().toString(36).slice(-4)}`;
       
       const existing2 = await prisma.dynamicTable.findUnique({
         where: { slug: uniqueSlug }
@@ -217,6 +243,12 @@ router.get('/check-name', authenticate, async (req, res) => {
     
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ message: 'Укажите название' });
+    }
+
+    if (isReservedName(name)) {
+      return res.status(409).json({ 
+        message: `Название "${name}" зарезервировано для системной таблицы` 
+      });
     }
     
     const existing = await prisma.dynamicTable.findFirst({

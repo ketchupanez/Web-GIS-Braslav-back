@@ -404,7 +404,7 @@ export class ChartsService {
     
     if (!chart) throw new Error('График не найден');
     
-    if (chart.createdBy !== userId && userRole !== 'SUPER_ADMIN') {
+    if (chart.createdBy !== userId && userRole !== 'MAIN_ADMIN' && userRole !== 'SUPER_ADMIN') {
       throw new Error('Нет прав для удаления');
     }
     
