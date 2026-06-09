@@ -75,6 +75,8 @@ bun prisma studio  - проверка БД
 1. Распаковать архив
 2. bun install
 3. Создать .env (есть .env.example):
-   VITE_API_URL=http://localhost:3000/api
+   - Для локальной разработки: VITE_API_URL=http://localhost:3000/api
+   - Для продакшена заменить на URL развёрнутого бэкенда, например:
+ VITE_API_URL=https://my-app.up.railway.app/api
 4. bun run build (собрать проект)
 5. Разместить папку dist на веб-сервере (Nginx/Apache)
