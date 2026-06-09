@@ -28,7 +28,7 @@ bun run db:generate
 (введите пароль пользователя postgres)
 
 
-### 4. Настроить .env (DATABASE_URL, JWT_SECRET)
+### 4. Настроить .env (DATABASE_URL, FRONTEND_URL, JWT_SECRET)
 на основе .env.example
 
 ### DATABASE_URL
@@ -43,6 +43,10 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/braslav_gis?schema=p
 DATABASE_URL="postgresql://postgres:postgres@localhost:5434/braslav_gis?schema=public"
 
 ! Замените postgres:postgres на ваши реальные логин и пароль от PostgreSQL.
+
+### FRONTEND_URL
+
+Замените на нужный
 
 ### JWT_SECRET
 
